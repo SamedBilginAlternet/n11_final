@@ -2,6 +2,8 @@ package payment.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import payment.dto.PaymentRequestDto;
+import payment.dto.PaymentResponseDto;
 import payment.exception.PaymentException;
 import payment.model.PaymentRequest;
 import payment.model.PaymentResult;
@@ -34,7 +36,4 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(new PaymentResponseDto("FAILED", e.getMessage()));
         }
     }
-
-    public record PaymentRequestDto(String method, double amount, String currency) {}
-    public record PaymentResponseDto(String status, String message) {}
 }
