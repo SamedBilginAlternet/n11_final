@@ -1,22 +1,23 @@
 package payment;
 
-import payment.methods.CreditCardPayment;
-import payment.methods.PayPalPayment;
+import payment.factory.PaymentMethodFactory;
 import payment.service.PaymentProcessor;
 import payment.ui.ConsolePaymentUI;
+import payment.ui.SwingPaymentForm;
 
-import java.util.Arrays;
+import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        PaymentProcessor processor = new PaymentProcessor(
-                Arrays.asList(
-                        new CreditCardPayment(),
-                        new PayPalPayment()
-                )
-        );
+        // PaymentMethod instances are created dynamically via reflection — no hardcoded constructors.
+        PaymentProcessor processor = new PaymentProcessor(PaymentMethodFactory.createAll());
 
-        ConsolePaymentUI ui = new ConsolePaymentUI(processor);
-        ui.start();
+        boolean useSwing = args.length == 0 || !args[0].equalsIgnoreCase("--console");
+
+        if (useSwing) {
+            new SwingPaymentForm(processor).start();
+        } else {
+            new ConsolePaymentUI(processor).start();
+        }
     }
 }
