@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Odeme Ekrani</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      width: 420px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: #1A73E8;
+      padding: 20px 28px;
+    }
+
+    .card-header h1 {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .card-body {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      color: #444;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .field select,
+    .field input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #212529;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .field select:focus,
+    .field input:focus {
+      border-color: #1A73E8;
+    }
+
+    button {
+      width: 100%;
+      padding: 11px;
+      background: #1A73E8;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    button:hover { background: #1558b0; }
+
+    .result {
+      display: none;
+      border-top: 1px solid #dee2e6;
+      padding: 16px 28px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .result.success { color: #28a745; }
+    .result.error   { color: #dc3545; }
+    .result.hidden  { display: none; }
+
+    .result .icon { font-size: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-header">
+    <h1>Odeme Formu</h1>
+  </div>
+
+  <div class="card-body">
+    <div class="field">
+      <label for="method">Odeme Yontemi</label>
+      <select id="method"></select>
+    </div>
+
+    <div class="field">
+      <label for="amount">Tutar</label>
+      <input id="amount" type="number" placeholder="orn. 100.00" min="0" step="0.01" />
+    </div>
+
+    <div class="field">
+      <label for="currency">Para Birimi</label>
+      <input id="currency" type="text" placeholder="orn. TRY" maxlength="3" />
+    </div>
+
+    <button onclick="pay()">Odemeyi Gerceklestir</button>
+  </div>
+
+  <div class="result hidden" id="result">
+    <span class="icon" id="resultIcon"></span>
+    <span id="resultMsg"></span>
+  </div>
+</div>
+
+<script>
+  async function loadMethods() {
+    const res = await fetch('/api/payment/methods');
+    const methods = await res.json();
+    const select = document.getElementById('method');
+    methods.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      select.appendChild(opt);
+    });
+  }
+
+  async function pay() {
+    const method   = document.getElementById('method').value;
+    const amount   = parseFloat(document.getElementById('amount').value);
+    const currency = document.getElementById('currency').value.trim().toUpperCase();
+
+    const res = await fetch('/api/payment/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method, amount, currency })
+    });
+
+    const data = await res.json();
+    const resultEl  = document.getElementById('result');
+    const iconEl    = document.getElementById('resultIcon');
+    const msgEl     = document.getElementById('resultMsg');
+
+    resultEl.classList.remove('hidden', 'success', 'error');
+
+    if (data.status === 'SUCCESS') {
+      resultEl.classList.add('success');
+      iconEl.textContent = '✓';
+    } else {
+      resultEl.classList.add('error');
+      iconEl.textContent = '✗';
+    }
+    msgEl.textContent = data.message;
+  }
+
+  loadMethods();
+</script>
+
+</body>
+</html>
