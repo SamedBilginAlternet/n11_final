@@ -16,8 +16,8 @@ import java.util.List;
 public class PaymentConfig {
 
     @Bean
-    public List<PaymentMethod> paymentMethods() {
-        return PaymentMethodFactory.createAll();
+    public List<PaymentMethod> paymentMethods(PaymentMethodFactory factory) {
+        return factory.createAll();
     }
 
     @Bean
