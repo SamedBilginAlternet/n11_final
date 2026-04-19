@@ -14,7 +14,8 @@ public class PaymentMethodFactory {
 
     private static final List<String> REGISTERED_CLASS_NAMES = List.of(
             "payment.methods.CreditCardPayment",
-            "payment.methods.PayPalPayment"
+            "payment.methods.PayPalPayment",
+            "payment.methods.BankTransferPayment"
     );
 
     /**
