@@ -5,6 +5,10 @@ import org.springframework.context.annotation.Configuration;
 import payment.core.PaymentMethod;
 import payment.factory.PaymentMethodFactory;
 import payment.service.PaymentProcessor;
+import payment.validation.AmountHandler;
+import payment.validation.CurrencyHandler;
+import payment.validation.FraudHandler;
+import payment.validation.PaymentHandler;
 
 import java.util.List;
 
@@ -17,7 +21,15 @@ public class PaymentConfig {
     }
 
     @Bean
-    public PaymentProcessor paymentProcessor(List<PaymentMethod> paymentMethods) {
-        return new PaymentProcessor(paymentMethods);
+    public PaymentHandler validationChain() {
+        PaymentHandler chain = new AmountHandler();
+        chain.setNext(new CurrencyHandler())
+             .setNext(new FraudHandler());
+        return chain;
+    }
+
+    @Bean
+    public PaymentProcessor paymentProcessor(List<PaymentMethod> paymentMethods, PaymentHandler validationChain) {
+        return new PaymentProcessor(paymentMethods, validationChain);
     }
 }
