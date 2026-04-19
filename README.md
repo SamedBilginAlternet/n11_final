@@ -1,14 +1,18 @@
-# Basit Odeme Ekrani (Java)
+# Basit Odeme Ekrani — Spring Boot + Docker
 
 Bu proje, bir odeme ekraninda **OOP + SOLID + Reflection + Chain of Responsibility** prensiplerini gosterir.
+Spring Boot REST API olarak calisir, Docker ile containerize edilmistir.
+
+---
 
 ## Ozellikler
 
 - `PaymentMethod` arayuzu ile **Strategy Pattern**
 - `PaymentMethodFactory` ile **Reflection tabanli dinamik nesne uretimi**
 - `PaymentHandler` zinciri ile **Chain of Responsibility** dogrulama katmani
-- `SwingPaymentForm` ile **GUI form arayuzu** (combo, reflection ile otomatik senkronize)
-- `ConsolePaymentUI` ile **konsol arayuzu** (alternatif mod)
+- **Spring Boot REST API** — `/api/payment/methods` ve `/api/payment/process`
+- **Web formu** — `localhost:8080` adresinde acilan statik HTML form
+- Combo kutusu, reflection ile yuklenen yontemleri otomatik alir (UI sync)
 - Custom exception hiyerarsisi ile guvenli hata yonetimi
 
 ---
@@ -19,7 +23,8 @@ Bu proje, bir odeme ekraninda **OOP + SOLID + Reflection + Chain of Responsibili
 
 `PaymentMethodFactory`, odeme yontemlerini `new` ile olusturmak yerine **Java Reflection** (`Class.forName` + `getDeclaredConstructor().newInstance()`) kullanarak runtime'da dinamik olarak yukler.
 
-`SwingPaymentForm` combo kutusu, `PaymentProcessor.getAvailableMethodKeys()` araciligiyla yuklu yontemleri otomatik alir — UI kodu degistirmeden yeni yontem eklenir.
+`PaymentConfig` bu listeyi `@Bean` olarak Spring context'e verir.
+Web formu, `/api/payment/methods` endpoint'ini cagirarak combo kutusunu otomatik doldurur — UI kodu degistirmeden yeni yontem eklenir.
 
 ### Chain of Responsibility
 
@@ -35,42 +40,81 @@ AmountHandler → CurrencyHandler → FraudHandler → PaymentMethod.pay()
 | `CurrencyHandler` | Para birimi TRY / USD / EUR olmali |
 | `FraudHandler` | Tutar 50.000 ustu islemleri engeller |
 
-Yeni bir kural eklemek = yeni bir `PaymentHandler` sinifi yazip zincire `.setNext()` ile baglamak.
-
 ---
 
 ## Paket Yapisi
 
 ```
-src/
-└── payment/
-    ├── Main.java                       # Giris noktasi
-    ├── core/
-    │   └── PaymentMethod.java          # Strateji arayuzu
-    ├── factory/
-    │   └── PaymentMethodFactory.java   # Reflection ile dinamik nesne uretimi
-    ├── methods/
-    │   ├── CreditCardPayment.java      # Kredi karti implementasyonu
-    │   ├── PayPalPayment.java          # PayPal implementasyonu
-    │   └── BankTransferPayment.java    # Havale/EFT implementasyonu (yalnizca TRY)
-    ├── model/
-    │   ├── PaymentRequest.java         # Immutable istek DTO (amount, currency)
-    │   ├── PaymentResult.java          # Immutable sonuc DTO
-    │   └── PaymentStatus.java          # SUCCESS / FAILED enum
-    ├── service/
-    │   └── PaymentProcessor.java       # Zinciri kosturur, routing yapar
-    ├── validation/
-    │   ├── PaymentHandler.java         # Abstract handler (CoR base)
-    │   ├── AmountHandler.java          # Tutar kontrolu
-    │   ├── CurrencyHandler.java        # Para birimi kontrolu
-    │   └── FraudHandler.java           # Fraud kontrolu
-    ├── exception/
-    │   ├── PaymentException.java       # Taban exception
-    │   ├── ValidationException.java    # Girdi dogrulama hatalari
-    │   └── ProcessingException.java    # Islem hatalari
-    └── ui/
-        ├── SwingPaymentForm.java       # GUI form (varsayilan)
-        └── ConsolePaymentUI.java       # Konsol modu
+src/main/java/payment/
+├── Main.java                        # Spring Boot giris noktasi (@SpringBootApplication)
+├── config/
+│   └── PaymentConfig.java           # @Configuration — factory + processor bean
+├── controller/
+│   └── PaymentController.java       # @RestController — /api/payment/*
+├── core/
+│   └── PaymentMethod.java           # Strateji arayuzu
+├── factory/
+│   └── PaymentMethodFactory.java    # Reflection ile dinamik nesne uretimi
+├── methods/
+│   ├── CreditCardPayment.java
+│   ├── PayPalPayment.java
+│   └── BankTransferPayment.java     # yalnizca TRY
+├── model/
+│   ├── PaymentRequest.java          # Immutable DTO (amount, currency)
+│   ├── PaymentResult.java
+│   └── PaymentStatus.java           # SUCCESS / FAILED
+├── service/
+│   └── PaymentProcessor.java        # Zinciri kosturur, routing yapar
+├── validation/
+│   ├── PaymentHandler.java          # Abstract CoR base
+│   ├── AmountHandler.java
+│   ├── CurrencyHandler.java
+│   └── FraudHandler.java
+└── exception/
+    ├── PaymentException.java
+    ├── ValidationException.java
+    └── ProcessingException.java
+
+src/main/resources/
+├── application.properties
+└── static/
+    └── index.html                   # Web form UI
+```
+
+---
+
+## API
+
+| Method | Endpoint | Aciklama |
+|---|---|---|
+| `GET` | `/api/payment/methods` | Yuklu odeme yontemlerini listeler |
+| `POST` | `/api/payment/process` | Odeme islemi gerceklestirir |
+
+### POST /api/payment/process
+
+**Request:**
+```json
+{
+  "method": "creditcard",
+  "amount": 100.0,
+  "currency": "TRY"
+}
+```
+
+**Response (basarili):**
+```json
+{
+  "status": "SUCCESS",
+  "message": "Kredi karti ile odeme basarili."
+}
+```
+
+**Response (hata):**
+```json
+{
+  "status": "FAILED",
+  "message": "Desteklenmeyen para birimi: GBP"
+}
 ```
 
 ---
@@ -88,65 +132,50 @@ classDiagram
     class PaymentMethodFactory {
       -List~String~ REGISTERED_CLASS_NAMES
       +List~PaymentMethod~ createAll()
-      +PaymentMethod create(String className)
+    }
+
+    class PaymentConfig {
+      <<@Configuration>>
+      +List~PaymentMethod~ paymentMethods()
+      +PaymentProcessor paymentProcessor()
+    }
+
+    class PaymentController {
+      <<@RestController>>
+      +List~String~ getMethods()
+      +ResponseEntity process(dto)
+    }
+
+    class PaymentProcessor {
+      -Map~String,PaymentMethod~ methodsByKey
+      +List~String~ getAvailableMethodKeys()
+      +PaymentResult process(methodKey, request)
+    }
+
+    class PaymentHandler {
+      <<abstract>>
+      +void handle(PaymentRequest)
     }
 
     class CreditCardPayment
     class PayPalPayment
     class BankTransferPayment
-
-    class PaymentProcessor {
-      -Map~String, PaymentMethod~ methodsByKey
-      +List~String~ getAvailableMethodKeys()
-      +PaymentResult process(String methodKey, PaymentRequest request)
-    }
-
-    class PaymentHandler {
-      <<abstract>>
-      -PaymentHandler next
-      +PaymentHandler setNext(PaymentHandler next)
-      +void handle(PaymentRequest request)
-    }
-
     class AmountHandler
     class CurrencyHandler
     class FraudHandler
 
-    class PaymentRequest {
-      -double amount
-      -String currency
-    }
-
-    class PaymentResult {
-      -PaymentStatus status
-      -String message
-    }
-
-    class PaymentException
-    class ValidationException
-    class ProcessingException
-
-    class SwingPaymentForm {
-      +void start()
-    }
-
-    class ConsolePaymentUI {
-      +void start()
-    }
-
     PaymentMethod <|.. CreditCardPayment
     PaymentMethod <|.. PayPalPayment
     PaymentMethod <|.. BankTransferPayment
-    PaymentMethodFactory ..> PaymentMethod : <<creates via reflection>>
-    PaymentProcessor --> PaymentMethod
+    PaymentMethodFactory ..> PaymentMethod : <<reflection>>
+    PaymentConfig --> PaymentMethodFactory
+    PaymentConfig --> PaymentProcessor
+    PaymentController --> PaymentProcessor
     PaymentProcessor --> PaymentHandler
+    PaymentProcessor --> PaymentMethod
     PaymentHandler <|-- AmountHandler
     PaymentHandler <|-- CurrencyHandler
     PaymentHandler <|-- FraudHandler
-    PaymentException <|-- ValidationException
-    PaymentException <|-- ProcessingException
-    SwingPaymentForm --> PaymentProcessor
-    ConsolePaymentUI --> PaymentProcessor
 ```
 
 ---
@@ -155,85 +184,55 @@ classDiagram
 
 ```mermaid
 flowchart TD
-    A[Main.java] --> B[PaymentMethodFactory.createAll via Reflection]
-    B --> C[PaymentProcessor]
-    C --> D{--console arg?}
-    D -- Evet --> E[ConsolePaymentUI]
-    D -- Hayir --> F[SwingPaymentForm\ncombo = getAvailableMethodKeys]
-    E --> G[PaymentProcessor.process]
-    F --> G
-    G --> H[AmountHandler]
-    H --> I[CurrencyHandler]
-    I --> J[FraudHandler]
-    H -- hata --> K[ValidationException]
-    I -- hata --> K
-    J -- hata --> K
-    J --> L{Yontem var mi?}
-    L -- Hayir --> M[ProcessingException]
-    L -- Evet --> N[PaymentMethod.pay]
-    N --> O[PaymentResult SUCCESS]
+    A[index.html] -->|GET /api/payment/methods| B[PaymentController]
+    A -->|POST /api/payment/process| B
+    B --> C[PaymentProcessor.process]
+    C --> D[AmountHandler]
+    D --> E[CurrencyHandler]
+    E --> F[FraudHandler]
+    D -- hata --> G[400 FAILED]
+    E -- hata --> G
+    F -- hata --> G
+    F --> H{Yontem var mi?}
+    H -- Hayir --> G
+    H -- Evet --> I[PaymentMethod.pay]
+    I --> J[200 SUCCESS]
 ```
-
----
-
-## Yeni Odeme Yontemi Eklemek
-
-1. `payment/methods/` altinda `PaymentMethod` implement eden sinif yaz.
-2. `PaymentMethodFactory.REGISTERED_CLASS_NAMES` listesine sinif adini ekle.
-3. Baska hicbir sinifi degistirmene gerek yok — UI combo otomatik guncellenir.
-
-## Yeni Dogrulama Kurali Eklemek
-
-1. `payment/validation/` altinda `PaymentHandler` extend eden sinif yaz.
-2. `PaymentProcessor.process()` icindeki zincire `.setNext()` ile ekle.
 
 ---
 
 ## Calistirma
 
-### Derleme (PowerShell)
-
-```powershell
-javac -d out (Get-ChildItem -Path .\src -Filter *.java -Recurse | ForEach-Object FullName)
-```
-
-### Derleme (Linux / macOS)
+### Docker ile (onerilen)
 
 ```bash
-find src -name "*.java" | xargs javac -d out
+docker-compose up --build
 ```
 
-### Calistirma
+Uygulama `http://localhost:8080` adresinde calisir.
+
+### Maven ile (yerel)
 
 ```bash
-# GUI modu (varsayilan)
-java -cp out payment.Main
-
-# Konsol modu
-java -cp out payment.Main --console
+mvn spring-boot:run
 ```
+
+### Yeni Odeme Yontemi Eklemek
+
+1. `payment/methods/` altinda `PaymentMethod` implement eden sinif yaz.
+2. `PaymentMethodFactory.REGISTERED_CLASS_NAMES` listesine sinif adini ekle.
+3. Baska hicbir sinifi degistirmene gerek yok.
 
 ---
 
 ## Ornek Test Girdileri
 
-### Basarili Kredi Karti
-- Yontem: `creditcard` — Tutar: `100` — Para Birimi: `TRY`
-
-### Basarili PayPal
-- Yontem: `paypal` — Tutar: `250` — Para Birimi: `USD`
-
-### Basarili Havale/EFT
-- Yontem: `banktransfer` — Tutar: `500` — Para Birimi: `TRY`
-
-### Desteklenmeyen Para Birimi (CurrencyHandler)
-- Para Birimi: `GBP` → `Desteklenmeyen para birimi: GBP`
-
-### Fraud Limiti Asimi (FraudHandler)
-- Tutar: `99999` → `Islem fraud kontrolunden gecemedi.`
-
-### Gecersiz Tutar (AmountHandler)
-- Tutar: `-50` → `Tutar sifirdan buyuk olmalidir.`
-
-### Havale TRY Disinda (BankTransferPayment)
-- Yontem: `banktransfer` — Para Birimi: `USD` → `Havale/EFT yalnizca TRY destekler.`
+| Yontem | Tutar | Para Birimi | Beklenen |
+|---|---|---|---|
+| `creditcard` | `100` | `TRY` | SUCCESS |
+| `paypal` | `250` | `USD` | SUCCESS |
+| `banktransfer` | `500` | `TRY` | SUCCESS |
+| `banktransfer` | `500` | `USD` | FAILED — yalnizca TRY |
+| `creditcard` | `99999` | `TRY` | FAILED — fraud limiti |
+| `paypal` | `100` | `GBP` | FAILED — desteklenmeyen para birimi |
+| `creditcard` | `-50` | `TRY` | FAILED — gecersiz tutar |
