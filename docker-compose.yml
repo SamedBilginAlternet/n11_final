@@ -2,5 +2,5 @@ services:
   payment-app:
     build: .
     ports:
-      - "8080:8080"
+      - "9090:8080"
     restart: unless-stopped
