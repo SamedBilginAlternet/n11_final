@@ -6,6 +6,10 @@ import payment.exception.ProcessingException;
 import payment.exception.ValidationException;
 import payment.model.PaymentRequest;
 import payment.model.PaymentResult;
+import payment.validation.AmountHandler;
+import payment.validation.CurrencyHandler;
+import payment.validation.FraudHandler;
+import payment.validation.PaymentHandler;
 
 import java.util.HashMap;
 import java.util.List;
@@ -29,9 +33,12 @@ public class PaymentProcessor {
         if (methodKey == null || methodKey.trim().isEmpty()) {
             throw new ValidationException("Odeme yontemi bos olamaz.");
         }
-        if (request.getAmount() <= 0) {
-            throw new ValidationException("Tutar sifirdan buyuk olmalidir.");
-        }
+
+        // Chain of Responsibility: AmountHandler → CurrencyHandler → FraudHandler
+        PaymentHandler chain = new AmountHandler();
+        chain.setNext(new CurrencyHandler())
+             .setNext(new FraudHandler());
+        chain.handle(request);
 
         PaymentMethod method = methodsByKey.get(methodKey.toLowerCase());
         if (method == null) {
@@ -41,4 +48,3 @@ public class PaymentProcessor {
         return method.pay(request);
     }
 }
-
