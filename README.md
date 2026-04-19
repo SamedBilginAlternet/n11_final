@@ -11,7 +11,7 @@ Spring Boot REST API olarak calisir, Docker ile containerize edilmistir.
 - `PaymentMethodFactory` ile **Reflection tabanli dinamik nesne uretimi**
 - `PaymentHandler` zinciri ile **Chain of Responsibility** dogrulama katmani
 - **Spring Boot REST API** — `/api/payment/methods` ve `/api/payment/process`
-- **Web formu** — `localhost:8080` adresinde acilan statik HTML form
+- **Web formu** — `localhost:9090` adresinde acilan statik HTML form
 - Combo kutusu, reflection ile yuklenen yontemleri otomatik alir (UI sync)
 - Custom exception hiyerarsisi ile guvenli hata yonetimi
 
@@ -21,14 +21,12 @@ Spring Boot REST API olarak calisir, Docker ile containerize edilmistir.
 
 ### Reflection Factory
 
-`PaymentMethodFactory`, odeme yontemlerini `new` ile olusturmak yerine **Java Reflection** (`Class.forName` + `getDeclaredConstructor().newInstance()`) kullanarak runtime'da dinamik olarak yukler.
-
-`PaymentConfig` bu listeyi `@Bean` olarak Spring context'e verir.
-Web formu, `/api/payment/methods` endpoint'ini cagirarak combo kutusunu otomatik doldurur — UI kodu degistirmeden yeni yontem eklenir.
+`PaymentMethodFactory`, odeme yontemlerini `new` ile olusturmak yerine **Java Reflection** kullanarak runtime'da yukler.
+Yuklenecek siniflar `application.properties`'deki `payment.methods` listesinden okunur — Java kodu degismez (OCP).
 
 ### Chain of Responsibility
 
-`PaymentProcessor.process()`, odeme yontemine gecmeden once bir dogrulama zinciri kosutur:
+`PaymentProcessor.process()`, odeme yontemine gecmeden once inject edilen dogrulama zincirini kosutur:
 
 ```
 AmountHandler → CurrencyHandler → FraudHandler → PaymentMethod.pay()
@@ -40,27 +38,32 @@ AmountHandler → CurrencyHandler → FraudHandler → PaymentMethod.pay()
 | `CurrencyHandler` | Para birimi TRY / USD / EUR olmali |
 | `FraudHandler` | Tutar 50.000 ustu islemleri engeller |
 
+Zincir `PaymentConfig`'de `@Bean` olarak kurulur ve `PaymentProcessor`'a inject edilir (DIP).
+
 ---
 
 ## Paket Yapisi
 
 ```
 src/main/java/payment/
-├── Main.java                        # Spring Boot giris noktasi (@SpringBootApplication)
+├── Main.java                        # @SpringBootApplication
 ├── config/
-│   └── PaymentConfig.java           # @Configuration — factory + processor bean
+│   └── PaymentConfig.java           # @Configuration — method bean + chain bean + processor bean
 ├── controller/
 │   └── PaymentController.java       # @RestController — /api/payment/*
+├── dto/
+│   ├── PaymentRequestDto.java       # API istek modeli (record)
+│   └── PaymentResponseDto.java      # API yanit modeli (record)
 ├── core/
 │   └── PaymentMethod.java           # Strateji arayuzu
 ├── factory/
-│   └── PaymentMethodFactory.java    # Reflection ile dinamik nesne uretimi
+│   └── PaymentMethodFactory.java    # @Component — reflection ile dinamik yukleme
 ├── methods/
 │   ├── CreditCardPayment.java
 │   ├── PayPalPayment.java
-│   └── BankTransferPayment.java     # yalnizca TRY
+│   └── BankTransferPayment.java
 ├── model/
-│   ├── PaymentRequest.java          # Immutable DTO (amount, currency)
+│   ├── PaymentRequest.java          # Immutable istek DTO (amount, currency)
 │   ├── PaymentResult.java
 │   └── PaymentStatus.java           # SUCCESS / FAILED
 ├── service/
@@ -76,7 +79,7 @@ src/main/java/payment/
     └── ProcessingException.java
 
 src/main/resources/
-├── application.properties
+├── application.properties           # Yuklu yontem listesi burada
 └── static/
     └── index.html                   # Web form UI
 ```
@@ -89,6 +92,13 @@ src/main/resources/
 |---|---|---|
 | `GET` | `/api/payment/methods` | Yuklu odeme yontemlerini listeler |
 | `POST` | `/api/payment/process` | Odeme islemi gerceklestirir |
+
+### GET /api/payment/methods
+
+**Response:**
+```json
+["creditcard", "paypal", "banktransfer"]
+```
 
 ### POST /api/payment/process
 
@@ -130,13 +140,15 @@ classDiagram
     }
 
     class PaymentMethodFactory {
-      -List~String~ REGISTERED_CLASS_NAMES
+      <<@Component>>
+      -List~String~ registeredClassNames
       +List~PaymentMethod~ createAll()
     }
 
     class PaymentConfig {
       <<@Configuration>>
       +List~PaymentMethod~ paymentMethods()
+      +PaymentHandler validationChain()
       +PaymentProcessor paymentProcessor()
     }
 
@@ -148,6 +160,7 @@ classDiagram
 
     class PaymentProcessor {
       -Map~String,PaymentMethod~ methodsByKey
+      -PaymentHandler validationChain
       +List~String~ getAvailableMethodKeys()
       +PaymentResult process(methodKey, request)
     }
@@ -170,6 +183,7 @@ classDiagram
     PaymentMethodFactory ..> PaymentMethod : <<reflection>>
     PaymentConfig --> PaymentMethodFactory
     PaymentConfig --> PaymentProcessor
+    PaymentConfig --> PaymentHandler
     PaymentController --> PaymentProcessor
     PaymentProcessor --> PaymentHandler
     PaymentProcessor --> PaymentMethod
@@ -209,7 +223,7 @@ flowchart TD
 docker-compose up --build
 ```
 
-Uygulama `http://localhost:8080` adresinde calisir.
+Uygulama `http://localhost:9090` adresinde calisir.
 
 ### Maven ile (yerel)
 
@@ -217,11 +231,133 @@ Uygulama `http://localhost:8080` adresinde calisir.
 mvn spring-boot:run
 ```
 
+Uygulama `http://localhost:8080` adresinde calisir.
+
+---
+
+## Gelistirme Kilavuzu
+
 ### Yeni Odeme Yontemi Eklemek
 
-1. `payment/methods/` altinda `PaymentMethod` implement eden sinif yaz.
-2. `PaymentMethodFactory.REGISTERED_CLASS_NAMES` listesine sinif adini ekle.
-3. Baska hicbir sinifi degistirmene gerek yok.
+**1. Sinif yaz** — `payment/methods/` altinda `PaymentMethod` implement et:
+
+```java
+package payment.methods;
+
+public class ApplePayPayment implements PaymentMethod {
+    @Override
+    public String getMethodKey() { return "applepay"; }
+
+    @Override
+    public PaymentResult pay(PaymentRequest request) throws PaymentException {
+        return new PaymentResult(PaymentStatus.SUCCESS, "Apple Pay ile odeme basarili.");
+    }
+}
+```
+
+**2. `application.properties`'e ekle** — baska hicbir dosyaya dokunma:
+
+```properties
+payment.methods=...,payment.methods.ApplePayPayment
+```
+
+Web formu combo kutusu otomatik guncellenir.
+
+---
+
+### Yeni Dogrulama Kurali Eklemek
+
+**1. Handler yaz** — `payment/validation/` altinda `PaymentHandler` extend et:
+
+```java
+package payment.validation;
+
+public class MaxAmountHandler extends PaymentHandler {
+    @Override
+    public void handle(PaymentRequest request) throws PaymentException {
+        if (request.getAmount() > 10_000)
+            throw new ValidationException("Tek islemde maksimum 10.000 girilebilir.");
+        super.handle(request);
+    }
+}
+```
+
+**2. `PaymentConfig`'de zincire ekle** — sadece bu metodu guncelle:
+
+```java
+@Bean
+public PaymentHandler validationChain() {
+    PaymentHandler chain = new AmountHandler();
+    chain.setNext(new CurrencyHandler())
+         .setNext(new FraudHandler())
+         .setNext(new MaxAmountHandler());  // ← ekle
+    return chain;
+}
+```
+
+`PaymentProcessor` degismez.
+
+---
+
+### Yeni Endpoint Eklemek
+
+**1. Controller'a metod ekle** — `PaymentController.java`:
+
+```java
+@GetMapping("/status")
+public ResponseEntity<String> status() {
+    return ResponseEntity.ok("Sistem aktif");
+}
+```
+
+**Yeni bir kaynak icin ayri controller yaz** (SRP):
+
+```java
+package payment.controller;
+
+@RestController
+@RequestMapping("/api/report")
+public class ReportController {
+
+    @GetMapping("/summary")
+    public ResponseEntity<String> summary() {
+        return ResponseEntity.ok("Rapor burada");
+    }
+}
+```
+
+---
+
+### Yeni DTO Eklemek
+
+`payment/dto/` altina yeni bir `record` yaz:
+
+```java
+package payment.dto;
+
+public record RefundRequestDto(String transactionId, double amount) {}
+```
+
+Controller'da import edip kullan — baska degisiklik gerekmez.
+
+---
+
+### Yeni Exception Eklemek
+
+`payment/exception/` altinda `PaymentException` extend et:
+
+```java
+package payment.exception;
+
+public class InsufficientFundsException extends PaymentException {
+    public InsufficientFundsException(String message) {
+        super(message);
+    }
+}
+```
+
+Handler veya payment method icinde `throw new InsufficientFundsException(...)` ile kullan.
+`PaymentController`'daki `catch (PaymentException e)` blogu otomatik yakalar.
 
 ---
 
