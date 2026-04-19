@@ -19,7 +19,7 @@ public class ConsolePaymentUI {
 
         try {
             System.out.println("=== Basit Odeme Ekrani ===");
-            System.out.println("Yontemler: creditcard, paypal");
+            System.out.println("Yontemler: creditcard, paypal, banktransfer");
 
             System.out.print("Odeme yontemi: ");
             String method = scanner.nextLine();
@@ -30,10 +30,7 @@ public class ConsolePaymentUI {
             System.out.print("Para birimi (orn. TRY): ");
             String currency = scanner.nextLine();
 
-            System.out.print("Odeme bilgisi (kart no veya email): ");
-            String payerInfo = scanner.nextLine();
-
-            PaymentRequest request = new PaymentRequest(amount, currency, payerInfo);
+            PaymentRequest request = new PaymentRequest(amount, currency);
             PaymentResult result = paymentProcessor.process(method, request);
 
             System.out.println("Durum: " + result.getStatus());
@@ -45,4 +42,3 @@ public class ConsolePaymentUI {
         }
     }
 }
-

@@ -22,7 +22,6 @@ public class SwingPaymentForm {
     private JComboBox<String> methodCombo;
     private JTextField amountField;
     private JTextField currencyField;
-    private JTextField payerInfoField;
     private JLabel resultLabel;
     private JLabel statusIconLabel;
 
@@ -37,7 +36,7 @@ public class SwingPaymentForm {
     private void buildAndShow() {
         frame = new JFrame("Odeme Ekrani");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(440, 380);
+        frame.setSize(440, 330);
         frame.setLocationRelativeTo(null);
         frame.setResizable(false);
 
@@ -72,7 +71,7 @@ public class SwingPaymentForm {
         // Payment method
         lc.gridy = 0; fc.gridy = 0;
         form.add(label("Odeme Yontemi:"), lc);
-        methodCombo = new JComboBox<>(new String[]{"creditcard", "paypal"});
+        methodCombo = new JComboBox<>(new String[]{"creditcard", "paypal", "banktransfer"});
         styleCombo(methodCombo);
         form.add(methodCombo, fc);
 
@@ -87,12 +86,6 @@ public class SwingPaymentForm {
         form.add(label("Para Birimi:"), lc);
         currencyField = styledField("orn. TRY");
         form.add(currencyField, fc);
-
-        // Payer info
-        lc.gridy = 3; fc.gridy = 3;
-        form.add(label("Odeme Bilgisi:"), lc);
-        payerInfoField = styledField("Kart no veya e-posta");
-        form.add(payerInfoField, fc);
 
         // ── Pay button ───────────────────────────────────────────────────────
         JButton payBtn = new JButton("Odemeyi Gerceklestir");
@@ -146,7 +139,6 @@ public class SwingPaymentForm {
         String method = (String) methodCombo.getSelectedItem();
         String amountText = amountField.getText().trim();
         String currency = currencyField.getText().trim();
-        String payerInfo = payerInfoField.getText().trim();
 
         double amount;
         try {
@@ -157,7 +149,7 @@ public class SwingPaymentForm {
         }
 
         try {
-            PaymentRequest request = new PaymentRequest(amount, currency, payerInfo);
+            PaymentRequest request = new PaymentRequest(amount, currency);
             PaymentResult result = paymentProcessor.process(method, request);
             boolean success = result.getStatus() == PaymentStatus.SUCCESS;
             showResult(success, result.getMessage());
