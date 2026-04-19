@@ -21,6 +21,10 @@ public class PaymentProcessor {
         }
     }
 
+    public List<String> getAvailableMethodKeys() {
+        return new java.util.ArrayList<>(methodsByKey.keySet());
+    }
+
     public PaymentResult process(String methodKey, PaymentRequest request) throws PaymentException {
         if (methodKey == null || methodKey.trim().isEmpty()) {
             throw new ValidationException("Odeme yontemi bos olamaz.");

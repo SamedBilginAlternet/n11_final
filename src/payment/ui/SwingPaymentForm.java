@@ -68,10 +68,11 @@ public class SwingPaymentForm {
         fc.insets = new Insets(6, 0, 6, 0);
         fc.gridx = 1;
 
-        // Payment method
+        // Payment method — keys loaded dynamically from PaymentProcessor
         lc.gridy = 0; fc.gridy = 0;
         form.add(label("Odeme Yontemi:"), lc);
-        methodCombo = new JComboBox<>(new String[]{"creditcard", "paypal", "banktransfer"});
+        String[] keys = paymentProcessor.getAvailableMethodKeys().toArray(new String[0]);
+        methodCombo = new JComboBox<>(keys);
         styleCombo(methodCombo);
         form.add(methodCombo, fc);
 
