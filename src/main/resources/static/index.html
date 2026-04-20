@@ -119,7 +119,7 @@
 
     <div class="field">
       <label for="currency">Para Birimi</label>
-      <input id="currency" type="text" placeholder="orn. TRY" maxlength="3" />
+      <select id="currency"></select>
     </div>
 
     <button onclick="pay()">Odemeyi Gerceklestir</button>
@@ -147,7 +147,7 @@
   async function pay() {
     const method   = document.getElementById('method').value;
     const amount   = parseFloat(document.getElementById('amount').value);
-    const currency = document.getElementById('currency').value.trim().toUpperCase();
+    const currency = document.getElementById('currency').value;
 
     const res = await fetch('/api/payment/process', {
       method: 'POST',
@@ -172,7 +172,20 @@
     msgEl.textContent = data.message;
   }
 
+  async function loadCurrencies() {
+    const res = await fetch('/api/payment/currencies');
+    const currencies = await res.json();
+    const select = document.getElementById('currency');
+    currencies.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      select.appendChild(opt);
+    });
+  }
+
   loadMethods();
+  loadCurrencies();
 </script>
 
 </body>
