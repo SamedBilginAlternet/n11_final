@@ -15,11 +15,10 @@ import payment.validation.PaymentHandler;
 public class PaymentConfig {
 
     @Bean
-    public PaymentHandler validationChain(CurrencyHandler currencyHandler) {
-        PaymentHandler chain = new AmountHandler();
-        chain.setNext(currencyHandler)
-             .setNext(new FraudHandler());
-        return chain;
+    public PaymentHandler validationChain(AmountHandler amountHandler, CurrencyHandler currencyHandler, FraudHandler fraudHandler) {
+        amountHandler.setNext(currencyHandler)
+                     .setNext(fraudHandler);
+        return amountHandler;
     }
 
     @Bean
