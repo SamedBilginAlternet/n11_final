@@ -15,6 +15,7 @@ Spring Boot REST API olarak calisir, Docker ile containerize edilmistir.
 - Combo kutusu, reflection ile yuklenen yontemleri otomatik alir (UI sync)
 - Custom exception hiyerarsisi ile guvenli hata yonetimi
 - **PostgreSQL entegrasyonu** — her odeme islemi `payment_transactions` tablosuna kaydedilir
+- **DB tabanli konfigürasyon** — odeme yontemleri ve para birimleri DB'den yonetilir, `DataSeeder` ile ilk veri otomatik yuklenir
 
 ---
 
@@ -23,7 +24,8 @@ Spring Boot REST API olarak calisir, Docker ile containerize edilmistir.
 ### Reflection Factory
 
 `PaymentMethodFactory`, odeme yontemlerini `new` ile olusturmak yerine **Java Reflection** kullanarak runtime'da yukler.
-Yuklenecek siniflar `application.properties`'deki `payment.methods` listesinden okunur — Java kodu degismez (OCP).
+Yuklenecek sinif isimleri `payment_method_configs` tablosundan okunur — Java kodu degismez (OCP).
+Yeni bir odeme yontemi eklemek icin sadece sinif yazilir ve DB'ye kayit eklenir.
 
 ### Chain of Responsibility
 
@@ -36,7 +38,7 @@ AmountHandler → CurrencyHandler → FraudHandler → PaymentMethod.pay()
 | Handler | Kontrol |
 |---|---|
 | `AmountHandler` | Tutar > 0 olmali |
-| `CurrencyHandler` | Para birimi TRY / USD / EUR olmali |
+| `CurrencyHandler` | Para birimi `currencies` tablosundaki degerlerden biri olmali |
 | `FraudHandler` | Tutar 50.000 ustu islemleri engeller |
 
 Zincir `PaymentConfig`'de `@Bean` olarak kurulur ve `PaymentProcessor`'a inject edilir (DIP).
@@ -49,7 +51,8 @@ Zincir `PaymentConfig`'de `@Bean` olarak kurulur ve `PaymentProcessor`'a inject 
 src/main/java/payment/
 ├── Main.java                        # @SpringBootApplication
 ├── config/
-│   └── PaymentConfig.java           # @Configuration — method bean + chain bean + processor bean
+│   ├── PaymentConfig.java           # @Configuration — method bean + chain bean + processor bean
+│   └── DataSeeder.java              # ApplicationRunner — currencies ve payment methods seed
 ├── controller/
 │   └── PaymentController.java       # @RestController — /api/payment/*
 ├── dto/
@@ -58,7 +61,9 @@ src/main/java/payment/
 ├── core/
 │   └── PaymentMethod.java           # Strateji arayuzu
 ├── entity/
-│   └── PaymentTransaction.java      # @Entity — DB kaydi (method, amount, currency, status, timestamp)
+│   ├── PaymentTransaction.java      # @Entity — odeme islemi kaydi
+│   ├── Currency.java                # @Entity — desteklenen para birimleri
+│   └── PaymentMethodConfig.java     # @Entity — odeme yontemi sinif isimleri
 ├── factory/
 │   └── PaymentMethodFactory.java    # @Component — reflection ile dinamik yukleme
 ├── methods/
@@ -70,7 +75,9 @@ src/main/java/payment/
 │   ├── PaymentResult.java
 │   └── PaymentStatus.java           # SUCCESS / FAILED
 ├── repository/
-│   └── PaymentRepository.java       # JpaRepository — payment_transactions tablosu
+│   ├── PaymentRepository.java             # JpaRepository — payment_transactions
+│   ├── CurrencyRepository.java            # JpaRepository — currencies
+│   └── PaymentMethodConfigRepository.java # JpaRepository — payment_method_configs
 ├── service/
 │   └── PaymentProcessor.java        # Zinciri kosturur, routing yapar, DB'ye kaydeder
 ├── validation/
@@ -84,7 +91,7 @@ src/main/java/payment/
     └── ProcessingException.java
 
 src/main/resources/
-├── application.properties           # Yuklu yontem listesi burada
+├── application.properties           # Datasource + JPA config
 └── static/
     └── index.html                   # Web form UI
 ```
@@ -146,7 +153,7 @@ classDiagram
 
     class PaymentMethodFactory {
       <<@Component>>
-      -List~String~ registeredClassNames
+      -PaymentMethodConfigRepository configRepository
       +List~PaymentMethod~ createAll()
     }
 
@@ -186,6 +193,8 @@ classDiagram
     PaymentMethod <|.. PayPalPayment
     PaymentMethod <|.. BankTransferPayment
     PaymentMethodFactory ..> PaymentMethod : <<reflection>>
+    PaymentMethodFactory --> PaymentMethodConfigRepository
+    CurrencyHandler --> CurrencyRepository
     PaymentConfig --> PaymentMethodFactory
     PaymentConfig --> PaymentProcessor
     PaymentConfig --> PaymentHandler
@@ -237,7 +246,24 @@ Her basarili odeme islemi `payment_transactions` tablosuna kaydedilir:
 | `message` | VARCHAR | Sonuc mesaji |
 | `created_at` | TIMESTAMP | Islem zamani |
 
-Tablo `spring.jpa.hibernate.ddl-auto=update` ile otomatik olusturulur.
+Tablolar `spring.jpa.hibernate.ddl-auto=update` ile otomatik olusturulur.
+
+### currencies
+
+| Kolon | Tip | Aciklama |
+|---|---|---|
+| `id` | BIGSERIAL | Primary key |
+| `code` | VARCHAR | Para birimi kodu (TRY, USD, EUR) |
+
+### payment_method_configs
+
+| Kolon | Tip | Aciklama |
+|---|---|---|
+| `id` | BIGSERIAL | Primary key |
+| `method_key` | VARCHAR | Yontem anahtari (creditcard, paypal, banktransfer) |
+| `class_name` | VARCHAR | Reflection ile yuklenecek sinif adi |
+
+Ilk veri `DataSeeder` tarafindan uygulama baslarken otomatik yuklenir (varsa atlanir).
 
 ---
 
@@ -294,13 +320,20 @@ public class ApplePayPayment implements PaymentMethod {
 }
 ```
 
-**2. `application.properties`'e ekle** — baska hicbir dosyaya dokunma:
+**2. DB'ye kayit ekle** — baska hicbir dosyaya dokunma:
 
-```properties
-payment.methods=...,payment.methods.ApplePayPayment
+```sql
+INSERT INTO payment_method_configs (method_key, class_name)
+VALUES ('applepay', 'payment.methods.ApplePayPayment');
 ```
 
-Web formu combo kutusu otomatik guncellenir.
+Ya da `DataSeeder`'a satir ekle. Web formu combo kutusu otomatik guncellenir.
+
+**Yeni para birimi eklemek icin:**
+
+```sql
+INSERT INTO currencies (code) VALUES ('GBP');
+```
 
 ---
 
