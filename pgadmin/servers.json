@@ -8,6 +8,7 @@
       "MaintenanceDB": "paymentdb",
       "Username": "postgres",
       "Password": "postgres",
+      "PassFile": "/pgadmin4/pgpass",
       "SSLMode": "prefer"
     }
   }
