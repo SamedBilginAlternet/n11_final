@@ -7,6 +7,7 @@ import payment.dto.PaymentResponseDto;
 import payment.exception.PaymentException;
 import payment.model.PaymentRequest;
 import payment.model.PaymentResult;
+import payment.repository.CurrencyRepository;
 import payment.service.PaymentProcessor;
 
 import java.util.List;
@@ -16,14 +17,23 @@ import java.util.List;
 public class PaymentController {
 
     private final PaymentProcessor processor;
+    private final CurrencyRepository currencyRepository;
 
-    public PaymentController(PaymentProcessor processor) {
+    public PaymentController(PaymentProcessor processor, CurrencyRepository currencyRepository) {
         this.processor = processor;
+        this.currencyRepository = currencyRepository;
     }
 
     @GetMapping("/methods")
     public List<String> getMethods() {
         return processor.getAvailableMethodKeys();
+    }
+
+    @GetMapping("/currencies")
+    public List<String> getCurrencies() {
+        return currencyRepository.findAll().stream()
+                .map(c -> c.getCode().toUpperCase())
+                .toList();
     }
 
     @PostMapping("/process")
