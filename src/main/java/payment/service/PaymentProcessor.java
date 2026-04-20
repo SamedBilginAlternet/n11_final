@@ -5,32 +5,31 @@ import payment.entity.PaymentTransaction;
 import payment.exception.PaymentException;
 import payment.exception.ProcessingException;
 import payment.exception.ValidationException;
+import payment.factory.PaymentMethodFactory;
 import payment.model.PaymentRequest;
 import payment.model.PaymentResult;
 import payment.repository.PaymentRepository;
 import payment.validation.PaymentHandler;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class PaymentProcessor {
-    private final Map<String, PaymentMethod> methodsByKey;
+    private final PaymentMethodFactory factory;
     private final PaymentHandler validationChain;
     private final PaymentRepository paymentRepository;
 
-    public PaymentProcessor(List<PaymentMethod> methods, PaymentHandler validationChain, PaymentRepository paymentRepository) {
+    public PaymentProcessor(PaymentMethodFactory factory, PaymentHandler validationChain, PaymentRepository paymentRepository) {
+        this.factory = factory;
         this.validationChain = validationChain;
         this.paymentRepository = paymentRepository;
-        this.methodsByKey = new HashMap<>();
-        for (PaymentMethod method : methods) {
-            methodsByKey.put(method.getMethodKey().toLowerCase(), method);
-        }
     }
 
     public List<String> getAvailableMethodKeys() {
-        return new ArrayList<>(methodsByKey.keySet());
+        return factory.createAll().stream()
+                .map(m -> m.getMethodKey().toLowerCase())
+                .collect(Collectors.toList());
     }
 
     public PaymentResult process(String methodKey, PaymentRequest request) throws PaymentException {
@@ -39,6 +38,9 @@ public class PaymentProcessor {
         }
 
         validationChain.handle(request);
+
+        Map<String, PaymentMethod> methodsByKey = factory.createAll().stream()
+                .collect(Collectors.toMap(m -> m.getMethodKey().toLowerCase(), m -> m));
 
         PaymentMethod method = methodsByKey.get(methodKey.toLowerCase());
         if (method == null) {
