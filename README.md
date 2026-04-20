@@ -14,6 +14,7 @@ Spring Boot REST API olarak calisir, Docker ile containerize edilmistir.
 - **Web formu** — `localhost:9090` adresinde acilan statik HTML form
 - Combo kutusu, reflection ile yuklenen yontemleri otomatik alir (UI sync)
 - Custom exception hiyerarsisi ile guvenli hata yonetimi
+- **PostgreSQL entegrasyonu** — her odeme islemi `payment_transactions` tablosuna kaydedilir
 
 ---
 
@@ -56,6 +57,8 @@ src/main/java/payment/
 │   └── PaymentResponseDto.java      # API yanit modeli (record)
 ├── core/
 │   └── PaymentMethod.java           # Strateji arayuzu
+├── entity/
+│   └── PaymentTransaction.java      # @Entity — DB kaydi (method, amount, currency, status, timestamp)
 ├── factory/
 │   └── PaymentMethodFactory.java    # @Component — reflection ile dinamik yukleme
 ├── methods/
@@ -66,8 +69,10 @@ src/main/java/payment/
 │   ├── PaymentRequest.java          # Immutable istek DTO (amount, currency)
 │   ├── PaymentResult.java
 │   └── PaymentStatus.java           # SUCCESS / FAILED
+├── repository/
+│   └── PaymentRepository.java       # JpaRepository — payment_transactions tablosu
 ├── service/
-│   └── PaymentProcessor.java        # Zinciri kosturur, routing yapar
+│   └── PaymentProcessor.java        # Zinciri kosturur, routing yapar, DB'ye kaydeder
 ├── validation/
 │   ├── PaymentHandler.java          # Abstract CoR base
 │   ├── AmountHandler.java
@@ -187,9 +192,11 @@ classDiagram
     PaymentController --> PaymentProcessor
     PaymentProcessor --> PaymentHandler
     PaymentProcessor --> PaymentMethod
+    PaymentProcessor --> PaymentRepository
     PaymentHandler <|-- AmountHandler
     PaymentHandler <|-- CurrencyHandler
     PaymentHandler <|-- FraudHandler
+    PaymentRepository ..> PaymentTransaction : <<saves>>
 ```
 
 ---
@@ -210,8 +217,27 @@ flowchart TD
     F --> H{Yontem var mi?}
     H -- Hayir --> G
     H -- Evet --> I[PaymentMethod.pay]
-    I --> J[200 SUCCESS]
+    I --> K[PaymentRepository.save]
+    K --> J[200 SUCCESS]
 ```
+
+---
+
+## Veritabani
+
+Her basarili odeme islemi `payment_transactions` tablosuna kaydedilir:
+
+| Kolon | Tip | Aciklama |
+|---|---|---|
+| `id` | BIGSERIAL | Otomatik artan primary key |
+| `method` | VARCHAR | Odeme yontemi (creditcard, paypal, banktransfer) |
+| `amount` | DOUBLE | Islem tutari |
+| `currency` | VARCHAR | Para birimi (TRY, USD, EUR) |
+| `status` | VARCHAR | SUCCESS / FAILED |
+| `message` | VARCHAR | Sonuc mesaji |
+| `created_at` | TIMESTAMP | Islem zamani |
+
+Tablo `spring.jpa.hibernate.ddl-auto=update` ile otomatik olusturulur.
 
 ---
 
@@ -223,9 +249,11 @@ flowchart TD
 docker-compose up --build
 ```
 
-Uygulama `http://localhost:9090` adresinde calisir.
+Uygulama `http://localhost:9090`, PostgreSQL `localhost:5432` adresinde calisir.
 
 ### Maven ile (yerel)
+
+Lokalde PostgreSQL kurulu olmasi gerekir. `application.properties`'deki `db` host'unu `localhost` ile degistir, ardindan:
 
 ```bash
 mvn spring-boot:run
