@@ -22,7 +22,9 @@ services:
       PGADMIN_CONFIG_SERVER_MODE: "False"
     volumes:
       - ./pgadmin/servers.json:/pgadmin4/servers.json
-      - ./pgadmin/pgpass:/pgadmin4/pgpass
+      - ./pgadmin/pgpass:/tmp/pgpass
+    entrypoint: >
+      /bin/sh -c "cp /tmp/pgpass /pgadmin4/pgpass && chmod 600 /pgadmin4/pgpass && /entrypoint.sh"
     ports:
       - "5050:80"
     depends_on:
