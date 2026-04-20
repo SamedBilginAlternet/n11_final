@@ -10,6 +10,8 @@ import payment.validation.CurrencyHandler;
 import payment.validation.FraudHandler;
 import payment.validation.PaymentHandler;
 
+import payment.repository.PaymentRepository;
+
 import java.util.List;
 
 @Configuration
@@ -29,7 +31,7 @@ public class PaymentConfig {
     }
 
     @Bean
-    public PaymentProcessor paymentProcessor(List<PaymentMethod> paymentMethods, PaymentHandler validationChain) {
-        return new PaymentProcessor(paymentMethods, validationChain);
+    public PaymentProcessor paymentProcessor(List<PaymentMethod> paymentMethods, PaymentHandler validationChain, PaymentRepository paymentRepository) {
+        return new PaymentProcessor(paymentMethods, validationChain, paymentRepository);
     }
 }
