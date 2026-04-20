@@ -1,4 +1,4 @@
-package payment.config;
+package payment.seeder;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -36,8 +36,8 @@ public class DataSeeder implements ApplicationRunner {
 
     private void seedPaymentMethods() {
         String[][] methods = {
-            {"creditcard", "payment.methods.CreditCardPayment"},
-            {"paypal",     "payment.methods.PayPalPayment"},
+            {"creditcard",   "payment.methods.CreditCardPayment"},
+            {"paypal",       "payment.methods.PayPalPayment"},
             {"banktransfer", "payment.methods.BankTransferPayment"}
         };
         for (String[] m : methods) {
