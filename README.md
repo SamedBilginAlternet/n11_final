@@ -16,6 +16,7 @@ Spring Boot REST API olarak calisir, Docker ile containerize edilmistir.
 - Custom exception hiyerarsisi ile guvenli hata yonetimi
 - **PostgreSQL entegrasyonu** — her odeme islemi `payment_transactions` tablosuna kaydedilir
 - **DB tabanli konfigürasyon** — odeme yontemleri ve para birimleri DB'den yonetilir, `DataSeeder` ile ilk veri otomatik yuklenir
+- **Swagger UI** — `localhost:9090/swagger-ui.html` adresinde interaktif API dokümantasyonu
 
 ---
 
@@ -52,7 +53,7 @@ src/main/java/payment/
 ├── Main.java                        # @SpringBootApplication
 ├── config/
 │   ├── PaymentConfig.java           # @Configuration — method bean + chain bean + processor bean
-│   └── DataSeeder.java              # ApplicationRunner — currencies ve payment methods seed
+│   └── OpenApiConfig.java           # @Configuration — Swagger/OpenAPI tanimlari
 ├── controller/
 │   └── PaymentController.java       # @RestController — /api/payment/*
 ├── dto/
@@ -85,6 +86,8 @@ src/main/java/payment/
 │   ├── AmountHandler.java
 │   ├── CurrencyHandler.java
 │   └── FraudHandler.java
+├── seeder/
+│   └── DataSeeder.java              # ApplicationRunner — currencies ve payment methods seed
 └── exception/
     ├── PaymentException.java
     ├── ValidationException.java
@@ -100,9 +103,13 @@ src/main/resources/
 
 ## API
 
+> Interaktif dokümantasyon: `http://localhost:9090/swagger-ui.html`
+> OpenAPI JSON: `http://localhost:9090/v3/api-docs`
+
 | Method | Endpoint | Aciklama |
 |---|---|---|
 | `GET` | `/api/payment/methods` | Yuklu odeme yontemlerini listeler |
+| `GET` | `/api/payment/currencies` | Desteklenen para birimlerini listeler |
 | `POST` | `/api/payment/process` | Odeme islemi gerceklestirir |
 
 ### GET /api/payment/methods
@@ -110,6 +117,13 @@ src/main/resources/
 **Response:**
 ```json
 ["creditcard", "paypal", "banktransfer"]
+```
+
+### GET /api/payment/currencies
+
+**Response:**
+```json
+["TRY", "USD", "EUR"]
 ```
 
 ### POST /api/payment/process
@@ -280,6 +294,7 @@ Uygulama `http://localhost:9090`, PostgreSQL `localhost:5432` adresinde calisir.
 | Servis | Adres | Aciklama |
 |---|---|---|
 | payment-app | `http://localhost:9090` | REST API + Web form |
+| Swagger UI | `http://localhost:9090/swagger-ui.html` | Interaktif API dokümantasyonu |
 | pgAdmin | `http://localhost:5050` | PostgreSQL yonetim paneli |
 | PostgreSQL | `localhost:5432` | Veritabani |
 
@@ -354,16 +369,15 @@ public class MaxAmountHandler extends PaymentHandler {
 }
 ```
 
-**2. `PaymentConfig`'de zincire ekle** — sadece bu metodu guncelle:
+**2. `@Component` ekle ve `PaymentConfig`'de zincire inject et** — sadece bu metodu guncelle:
 
 ```java
 @Bean
-public PaymentHandler validationChain() {
-    PaymentHandler chain = new AmountHandler();
-    chain.setNext(new CurrencyHandler())
-         .setNext(new FraudHandler())
-         .setNext(new MaxAmountHandler());  // ← ekle
-    return chain;
+public PaymentHandler validationChain(AmountHandler amountHandler, CurrencyHandler currencyHandler, FraudHandler fraudHandler, MaxAmountHandler maxAmountHandler) {
+    amountHandler.setNext(currencyHandler)
+                 .setNext(fraudHandler)
+                 .setNext(maxAmountHandler);  // ← ekle
+    return amountHandler;
 }
 ```
 
