@@ -251,6 +251,17 @@ docker-compose up --build
 
 Uygulama `http://localhost:9090`, PostgreSQL `localhost:5432` adresinde calisir.
 
+| Servis | Adres | Aciklama |
+|---|---|---|
+| payment-app | `http://localhost:9090` | REST API + Web form |
+| pgAdmin | `http://localhost:5050` | PostgreSQL yonetim paneli |
+| PostgreSQL | `localhost:5432` | Veritabani |
+
+**pgAdmin baglantisi:**
+1. `http://localhost:5050` adresini ac
+2. Giris: `admin@admin.com` / `admin`
+3. **Add New Server** → Host: `db`, Port: `5432`, Database: `paymentdb`, Username: `postgres`, Password: `postgres`
+
 ### Maven ile (yerel)
 
 Lokalde PostgreSQL kurulu olmasi gerekir. `application.properties`'deki `db` host'unu `localhost` ile degistir, ardindan:
