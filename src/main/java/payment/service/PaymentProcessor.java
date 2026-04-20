@@ -8,6 +8,7 @@ import payment.exception.ValidationException;
 import payment.factory.PaymentMethodFactory;
 import payment.model.PaymentRequest;
 import payment.model.PaymentResult;
+import payment.repository.CurrencyRepository;
 import payment.repository.PaymentRepository;
 import payment.validation.PaymentHandler;
 
@@ -19,17 +20,25 @@ public class PaymentProcessor {
     private final PaymentMethodFactory factory;
     private final PaymentHandler validationChain;
     private final PaymentRepository paymentRepository;
+    private final CurrencyRepository currencyRepository;
 
-    public PaymentProcessor(PaymentMethodFactory factory, PaymentHandler validationChain, PaymentRepository paymentRepository) {
+    public PaymentProcessor(PaymentMethodFactory factory, PaymentHandler validationChain, PaymentRepository paymentRepository, CurrencyRepository currencyRepository) {
         this.factory = factory;
         this.validationChain = validationChain;
         this.paymentRepository = paymentRepository;
+        this.currencyRepository = currencyRepository;
     }
 
     public List<String> getAvailableMethodKeys() {
         return factory.createAll().stream()
                 .map(m -> m.getMethodKey().toLowerCase())
                 .collect(Collectors.toList());
+    }
+
+    public List<String> getAvailableCurrencies() {
+        return currencyRepository.findAll().stream()
+                .map(c -> c.getCode().toUpperCase())
+                .toList();
     }
 
     public PaymentResult process(String methodKey, PaymentRequest request) throws PaymentException {

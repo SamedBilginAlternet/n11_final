@@ -3,6 +3,7 @@ package payment.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import payment.factory.PaymentMethodFactory;
+import payment.repository.CurrencyRepository;
 import payment.repository.PaymentRepository;
 import payment.service.PaymentProcessor;
 import payment.validation.AmountHandler;
@@ -22,7 +23,7 @@ public class PaymentConfig {
     }
 
     @Bean
-    public PaymentProcessor paymentProcessor(PaymentMethodFactory factory, PaymentHandler validationChain, PaymentRepository paymentRepository) {
-        return new PaymentProcessor(factory, validationChain, paymentRepository);
+    public PaymentProcessor paymentProcessor(PaymentMethodFactory factory, PaymentHandler validationChain, PaymentRepository paymentRepository, CurrencyRepository currencyRepository) {
+        return new PaymentProcessor(factory, validationChain, paymentRepository, currencyRepository);
     }
 }
