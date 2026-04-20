@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
 public class PaymentProcessor {
     private final PaymentMethodFactory factory;
     private final PaymentHandler validationChain;
@@ -30,9 +31,12 @@ public class PaymentProcessor {
     }
 
     public List<String> getAvailableMethodKeys() {
+        return loadMethodMap().keySet().stream().collect(Collectors.toList());
+    }
+
+    private Map<String, PaymentMethod> loadMethodMap() {
         return factory.createAll().stream()
-                .map(m -> m.getMethodKey().toLowerCase())
-                .collect(Collectors.toList());
+                .collect(Collectors.toMap(m -> m.getMethodKey().toLowerCase(), m -> m));
     }
 
     public List<String> getAvailableCurrencies() {
@@ -48,10 +52,7 @@ public class PaymentProcessor {
 
         validationChain.handle(request);
 
-        Map<String, PaymentMethod> methodsByKey = factory.createAll().stream()
-                .collect(Collectors.toMap(m -> m.getMethodKey().toLowerCase(), m -> m));
-
-        PaymentMethod method = methodsByKey.get(methodKey.toLowerCase());
+        PaymentMethod method = loadMethodMap().get(methodKey.toLowerCase());
         if (method == null) {
             throw new ProcessingException("Desteklenmeyen odeme yontemi: " + methodKey);
         }
