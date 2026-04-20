@@ -1,29 +1,28 @@
 package payment.factory;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import payment.core.PaymentMethod;
+import payment.repository.PaymentMethodConfigRepository;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Reflection-based factory that dynamically instantiates PaymentMethod implementations.
- * Class names are read from application.properties (payment.methods) — adding a new
- * payment method requires no code change, only a config update (OCP).
- */
 @Component
 public class PaymentMethodFactory {
 
-    @Value("${payment.methods}")
-    private List<String> registeredClassNames;
+    private final PaymentMethodConfigRepository configRepository;
+
+    public PaymentMethodFactory(PaymentMethodConfigRepository configRepository) {
+        this.configRepository = configRepository;
+    }
 
     public List<PaymentMethod> createAll() {
         List<PaymentMethod> methods = new ArrayList<>();
 
-        for (String className : registeredClassNames) {
+        for (var config : configRepository.findAll()) {
+            String className = config.getClassName().trim();
             try {
-                Class<?> clazz = Class.forName(className.trim());
+                Class<?> clazz = Class.forName(className);
                 Object instance = clazz.getDeclaredConstructor().newInstance();
 
                 if (instance instanceof PaymentMethod paymentMethod) {
