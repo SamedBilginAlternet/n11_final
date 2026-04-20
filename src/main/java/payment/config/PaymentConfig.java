@@ -23,9 +23,9 @@ public class PaymentConfig {
     }
 
     @Bean
-    public PaymentHandler validationChain() {
+    public PaymentHandler validationChain(CurrencyHandler currencyHandler) {
         PaymentHandler chain = new AmountHandler();
-        chain.setNext(new CurrencyHandler())
+        chain.setNext(currencyHandler)
              .setNext(new FraudHandler());
         return chain;
     }
